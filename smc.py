@@ -29,18 +29,27 @@ class SMC():
 
         Args:
             pdf (Callable[[np.ndarray], np.ndarray]):
-                A pdf of the one-dimensional probability distribution to be sampled.
-                universal-functionalized to take np.ndarray as an argument.
+                The pdf function of the one-dimensional target distribution.
+                It should be a universal function so that
+                it can take np.ndarray as an argument.
             start (float, optional):
-                The start point for sampling from a uniform distribution at
+                The starting point for sampling from a uniform distribution at
                 infinite temperature. Defaults to -100.
             end (float, optional): _description_. Defaults to 100.
-                The end point for sampling from a uniform distribution at
+                The ending point for sampling from a uniform distribution at
                 infinite temperature. Defaults to -100.
-            threshold (float, optional): _description_. Defaults to 0.5.
-            correlation_threshold (float, optional): _description_. Defaults to 0.01.
-            correlation_ratio (float, optional): _description_. Defaults to 0.9.
-            seed (int | None, optional): _description_. Defaults to None.
+            threshold (float, optional):
+                The threshold for the rate of decrease in ESS allowed during
+                inverse temperature update. Defaults to 0.5.
+            correlation_threshold (float, optional):
+                The threshold of the rate of decrease at which
+                the autocorrelation is  considered to have reached a
+                stable state in Metropolis Hasting. Defaults to 0.01.
+            correlation_ratio (float, optional):
+                The threshold for the percentage of steady state in
+                terminating Metropolis Hastings. Defaults to 0.9.
+            seed (int | None, optional):
+                Random generator initialization seed. Defaults to None.
         """
 
         def logpdf(x: np.ndarray) -> np.ndarray:
@@ -55,13 +64,22 @@ class SMC():
 
         self.reset(start, end)
 
-    def reset(self, start=None, end=None):
+    def reset(self, start: float | None = None, end: float | None = None):
+        """Reset Sequential Monte Carlo Sampler.
+
+        Args:
+            start (float | None, optional):
+                The starting point can be re-specified. Defaults to None.
+            end (float | None, optional):
+                The ending point can be re-specified. Defaults to None.
+        """
+
         self.beta = 0.0
         self.weights = None
         self.start = start if start is not None else self.start
         self.end = end if end is not None else self.end
 
-    def update_beta_and_weights(self):
+    def _update_beta_and_weights(self):
         old_beta = self.beta
         low_beta = self.beta
         high_beta = 2.0
@@ -89,14 +107,14 @@ class SMC():
         self.weights = np.exp(log_weights)
         self.weights /= np.sum(self.weights)
 
-    def resample(self):
+    def _resample(self):
         indexes = self.rng.choice(
             self.num_samples, self.num_samples, p=self.weights)
 
         self.x = self.x[indexes]
         self.loglikelihood = self.loglikelihood[indexes]
 
-    def mutate(self):
+    def _mutate(self):
         old_corr = 2.0
         corr = Pearson(self.x)
         while True:
@@ -118,17 +136,27 @@ class SMC():
             else:
                 break
 
-    def sampling(self, num_samples):
+    def sampling(self, num_samples: int) -> np.ndarray:
+        """Sampling from target distribution.
+
+        Args:
+            num_samples (int):
+                Number of samples to be sampled from the target distribution.
+
+        Returns:
+            np.ndarray:
+                Random numbers sampled from the target distribution.
+        """
         self.num_samples = num_samples
         self.ESS_threshold = int(self.num_samples * self.threshold)
         self.x = self.rng.uniform(self.start, self.end, self.num_samples)
         self.loglikelihood = self.logpdf(self.x)
 
         while True:
-            self.update_beta_and_weights()
-            self.resample()
-            self.mutate()
+            self._update_beta_and_weights()
+            self._resample()
+            self._mutate()
             if self.beta >= 1:
                 break
 
-        return self.x
+        return self.x.copy()
