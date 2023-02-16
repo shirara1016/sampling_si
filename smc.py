@@ -103,9 +103,14 @@ class SMC():
         self.weights /= np.sum(self.weights)
 
     def _tune(self):
+        if self.iteration > 1:
+            chain_scale = np.exp(
+                np.log(self.proposal_scales) + (self.chain_acc_rate - 0.234))
+            self.proposal_scales = 0.5 * (chain_scale + np.mean(chain_scale))
+
         ave = np.sum(self.x * self.weights)
         var = np.sum(self.weights * ((self.x - ave) ** 2))
-        self.std = 0.2 * np.sqrt(var)
+        self.std = np.sqrt(var)
 
     def _resample(self):
         indexes = self.rng.choice(
@@ -127,7 +132,7 @@ class SMC():
 
         while True:
             log_R = np.log(self.rng.random(self.num_samples))
-            proposal = self.x + self.std * \
+            proposal = self.x + 0.2 * self.std * \
                 self.rng.normal(size=self.num_samples)
             proposal_lp = self.logpdf(proposal)
 
@@ -175,8 +180,13 @@ class SMC():
             self._update_beta_and_weights()
             self._tune()
             self._resample()
+
+            print(self.proposal_scales)
+
             self._mutate()
+
             self.betas.append(self.beta)
+
             if self.beta >= 1:
                 break
 
