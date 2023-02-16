@@ -127,7 +127,8 @@ class SMC():
 
         while True:
             log_R = np.log(self.rng.random(self.num_samples))
-            proposal = self.rng.normal(self.x, self.std, self.num_samples)
+            proposal = self.x + self.std * \
+                self.rng.normal(size=self.num_samples)
             proposal_lp = self.logpdf(proposal)
 
             accepted = log_R < self.beta * \
