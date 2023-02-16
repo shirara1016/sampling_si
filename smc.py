@@ -64,12 +64,9 @@ class SMC():
         self.correlation_ratio = correlation_ratio
         self.rng = np.random.default_rng(seed=seed)
 
-    def _reset(self, start: float | None = None, end: float | None = None):
+    def _reset(self):
         self.beta = 0.0
         self.weights = None
-        self.start = start if start is not None else self.start
-        self.end = end if end is not None else self.end
-
         self.iteration = 0
 
         self.mh_steps = []
@@ -117,10 +114,17 @@ class SMC():
         self.x = self.x[indexes]
         self.loglikelihood = self.loglikelihood[indexes]
 
+        if self.iteration > 1:
+            self.proposal_scales = self.proposal_scales[indexes]
+            self.chain_acc_rate = self.chain_acc_rate[indexes]
+
     def _mutate(self):
         old_corr = 2.0
         corr = Pearson(self.x)
-        self.mh_step = 0
+
+        ac = []
+        mh_step = 0
+
         while True:
             log_R = np.log(self.rng.random(self.num_samples))
             proposal = self.rng.normal(self.x, self.std, self.num_samples)
@@ -128,11 +132,12 @@ class SMC():
 
             accepted = log_R < self.beta * \
                 (proposal_lp - self.loglikelihood)
+            ac.append(accepted)
 
             self.x[accepted] = proposal[accepted]
             self.loglikelihood[accepted] = proposal_lp[accepted]
 
-            self.mh_step += 1
+            mh_step += 1
 
             pearson_r = corr.get(self.x)
             ratio = np.mean(
@@ -141,6 +146,9 @@ class SMC():
                 old_corr = pearson_r
             else:
                 break
+
+        self.chain_acc_rate = np.mean(ac, axis=0)
+        self.mh_steps.append(mh_step)
 
     def sampling(self, num_samples: int) -> np.ndarray:
         """Sampling from target distribution.
@@ -167,7 +175,6 @@ class SMC():
             self._tune()
             self._resample()
             self._mutate()
-            self.mh_steps.append(self.mh_step)
             self.betas.append(self.beta)
             if self.beta >= 1:
                 break
