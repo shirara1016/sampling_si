@@ -117,6 +117,7 @@ class SMC():
     def _mutate(self):
         old_corr = 2.0
         corr = Pearson(self.x)
+        self.iter = 0
         while True:
             log_R = np.log(self.rng.random(self.num_samples))
             proposal = self.rng.normal(self.x, 1, self.num_samples)
@@ -127,6 +128,8 @@ class SMC():
 
             self.x[accepted] = proposal[accepted]
             self.loglikelihood[accepted] = proposal_lp[accepted]
+
+            self.iter += 1
 
             pearson_r = corr.get(self.x)
             ratio = np.mean(
@@ -152,10 +155,15 @@ class SMC():
         self.x = self.rng.uniform(self.start, self.end, self.num_samples)
         self.loglikelihood = self.logpdf(self.x)
 
+        self.iters = []
+        self.betas = []
+
         while True:
             self._update_beta_and_weights()
             self._resample()
             self._mutate()
+            self.iters.append(self.iter)
+            self.betas.append(self.beta)
             if self.beta >= 1:
                 break
 
