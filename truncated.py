@@ -3,14 +3,30 @@ from scipy.stats import norm, chi2
 
 
 def indicator(intervals):
-    intervals = intervals
-
     def flag(x):
         for lower, upper in intervals:
             if lower <= x <= upper:
-                return 1.0
-        return 0.0
+                return True
+        return False
     return np.vectorize(flag)
+
+
+def tn_log_pdf(mask):
+    def logpdf(x):
+        cond = mask(x)
+        lp = np.full(len(x), -np.inf)
+        lp[cond] = - x[cond] ** 2 / 2
+        return lp
+    return logpdf
+
+
+def tc2_log_pdf(mask, v):
+    def logpdf(x):
+        cond = mask(x) * (x > 0)
+        lp = np.full(len(x), -np.inf)
+        lp[cond] = (0.5 * v - 1) * np.log(x[cond]) - x[cond] / 2
+        return lp
+    return logpdf
 
 
 def tn_pdf(x, intervals):

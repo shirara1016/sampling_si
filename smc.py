@@ -18,7 +18,7 @@ class Pearson():
 class SMC():
     def __init__(
             self,
-            pdf: Callable[[np.ndarray], np.ndarray],
+            logpdf: Callable[[np.ndarray], np.ndarray],
             start: float = -100,
             end: float = 100,
             threshold: float = 0.5,
@@ -28,8 +28,8 @@ class SMC():
         """Sequential Monte Carlo Sampler for one-dimensional random variables.
 
         Args:
-            pdf (Callable[[np.ndarray], np.ndarray]):
-                The pdf function of the one-dimensional target distribution.
+            logpdf (Callable[[np.ndarray], np.ndarray]):
+                The logarithm pdf function of the one-dimensional target distribution.
                 It should be a universal function so that
                 it can take np.ndarray as an argument.
             start (float, optional):
@@ -51,10 +51,6 @@ class SMC():
             seed (int | None, optional):
                 Random generator initialization seed. Defaults to None.
         """
-
-        def logpdf(x: np.ndarray) -> np.ndarray:
-            return np.log(pdf(x))
-            # return np.log(pdf(x) + 1e-15)
 
         self.logpdf = logpdf
         self.start = start
