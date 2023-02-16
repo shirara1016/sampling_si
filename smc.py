@@ -57,29 +57,27 @@ class SMC():
             # return np.log(pdf(x) + 1e-15)
 
         self.logpdf = logpdf
+        self.start = start
+        self.end = end
         self.threshold = threshold
         self.correlation_threshold = correlation_threshold
         self.correlation_ratio = correlation_ratio
         self.rng = np.random.default_rng(seed=seed)
 
-        self.reset(start, end)
-
-    def reset(self, start: float | None = None, end: float | None = None):
-        """Reset Sequential Monte Carlo Sampler.
-
-        Args:
-            start (float | None, optional):
-                The starting point can be re-specified. Defaults to None.
-            end (float | None, optional):
-                The ending point can be re-specified. Defaults to None.
-        """
-
+    def _reset(self, start: float | None = None, end: float | None = None):
         self.beta = 0.0
         self.weights = None
         self.start = start if start is not None else self.start
         self.end = end if end is not None else self.end
 
+        self.iteration = 0
+
+        self.mh_steps = []
+        self.betas = []
+
     def _update_beta_and_weights(self):
+        self.iteration += 1
+
         old_beta = self.beta
         low_beta = self.beta
         high_beta = 2.0
@@ -122,7 +120,7 @@ class SMC():
     def _mutate(self):
         old_corr = 2.0
         corr = Pearson(self.x)
-        self.iter = 0
+        self.mh_step = 0
         while True:
             log_R = np.log(self.rng.random(self.num_samples))
             proposal = self.rng.normal(self.x, self.std, self.num_samples)
@@ -134,7 +132,7 @@ class SMC():
             self.x[accepted] = proposal[accepted]
             self.loglikelihood[accepted] = proposal_lp[accepted]
 
-            self.iter += 1
+            self.mh_step += 1
 
             pearson_r = corr.get(self.x)
             ratio = np.mean(
@@ -155,20 +153,21 @@ class SMC():
             np.ndarray:
                 Random numbers sampled from the target distribution.
         """
+        self._reset()
+
         self.num_samples = num_samples
         self.ESS_threshold = int(self.num_samples * self.threshold)
         self.x = self.rng.uniform(self.start, self.end, self.num_samples)
         self.loglikelihood = self.logpdf(self.x)
 
-        self.iters = []
-        self.betas = []
+        self.proposal_scales = np.ones(self.num_samples)
 
         while True:
             self._update_beta_and_weights()
             self._tune()
             self._resample()
             self._mutate()
-            self.iters.append(self.iter)
+            self.mh_steps.append(self.mh_step)
             self.betas.append(self.beta)
             if self.beta >= 1:
                 break
